@@ -111,7 +111,8 @@ void process(const char* img_fname) {
     cv::namedWindow("eroded", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
     cv::resizeWindow("eroded", 640, 480);
 
-    cv::Mat tmp, tmp2, tmp3, img = cv::imread(img_fname);
+    const cv::Mat img = cv::imread(img_fname);
+    cv::Mat tmp, tmp2;
     cv::Mat hsv[3];
     img.convertTo(tmp, CV_32FC3, 1/255.0);
     cv::cvtColor(tmp, tmp, cv::COLOR_BGR2HSV, 3);
@@ -120,11 +121,9 @@ void process(const char* img_fname) {
     threshold(hsv[1], tmp2);
     cv::imshow("out", tmp2);
 //  cv::Canny(tmp2, tmp2, 25, 40);
-
     morphological_filtering(tmp2);
 
     std::vector<std::vector<cv::Point2i>> contours { find_contours(tmp2) };
-
     const cv::Scalar red { 0, 0, 255 };
     cv::drawContours(img, contours, -1, red, 3);
 
