@@ -58,7 +58,6 @@ double determine_threshold(const cv::Mat& in) {
     cv::pyrDown(blurred, blurred);
     cv::calcHist(std::vector<cv::Mat>{blurred}, std::vector<int>{0},
         cv::Mat(), hist, std::vector<int>{64}, std::vector<float>{0.0, 1.0});
-        std::cout << hist << std::endl;
 
     int max_idx = 0, max = 0;
     for (int i = 0; i < 32; i++) {
