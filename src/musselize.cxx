@@ -20,7 +20,7 @@
  * The minimum area occupied by a possible mollusc.
  */
 #define MINIMUM_AREA 1e5
-
+#define ENABLE_THRESHOLD 0
 bool decide(std::vector<cv::Point2i> cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
@@ -51,8 +51,8 @@ std::vector<std::vector<cv::Point2i>> find_contours(const cv::Mat& in) {
     return contours;
 }
 
-void denoise(const cv::Mat& in, cv::Mat& out) {
-    cv::Mat tmp, blurred, hist;
+double determine_threshold(const cv::Mat& in) {
+    cv::Mat blurred, hist;
  
     cv::GaussianBlur(in, blurred, cv::Size(3, 3), 0);
     cv::pyrDown(blurred, blurred);
@@ -68,10 +68,15 @@ void denoise(const cv::Mat& in, cv::Mat& out) {
         }
     }
 
-    const int threshold = ((max_idx << 2) - 4) / 32.0;
-    std::cout <<  "thr:" << threshold << std::endl;
-    cv::threshold(in, tmp, threshold, 1.0, cv::THRESH_TOZERO);
-    in.convertTo(out, CV_8UC1, 255.0);
+    return (max_idx - 8.0) / 64.0;
+}
+
+void threshold(const cv::Mat& in, cv::Mat& out) {
+    cv::Mat tmp = in.clone();
+    const double threshold = determine_threshold(in);
+    std::cout << "threshold: " << threshold << std::endl;
+    cv::threshold(tmp, tmp, ENABLE_THRESHOLD ? threshold : 0, 1.0, cv::THRESH_TOZERO);
+    tmp.convertTo(out, CV_8UC1, 255.0);
     cv::compare(out, 0, out, cv::CMP_GT);
 }
 
@@ -113,7 +118,7 @@ void process(const char* img_fname) {
     cv::cvtColor(tmp, tmp, cv::COLOR_BGR2HSV, 3);
     cv::split(tmp, hsv);
 
-    denoise(hsv[1], tmp2);
+    threshold(hsv[1], tmp2);
     cv::imshow("out", tmp2);
 //  cv::Canny(tmp2, tmp2, 25, 40);
 
