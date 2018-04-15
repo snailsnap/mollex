@@ -14,8 +14,8 @@
  * A high boxiness value (greater than 2.0) indicates a very chaotic
  * shape that we are not interested in.
  */
-#define BOXINESS_CUTOFF_LO 1.18d
-#define BOXINESS_CUTOFF_HI 1.5d
+#define BOXINESS_CUTOFF_LO 1.18
+#define BOXINESS_CUTOFF_HI 1.5
 /*
  * The minimum area occupied by a possible mollusc.
  */
