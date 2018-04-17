@@ -31,8 +31,24 @@ bool decide(const contour& cont) {
     std::cout << area << " b:" << brect_area << " " << quotient << std::endl;
 #endif
 
-    return quotient < BOXINESS_CUTOFF_LO ||
-           quotient > BOXINESS_CUTOFF_HI;
+    if (quotient < BOXINESS_CUTOFF_LO ||
+        quotient > BOXINESS_CUTOFF_HI) {
+        return true;
+    }
+    {
+        contour convex;
+        cv::convexHull(cont, convex);
+        const double convex_area = cv::contourArea(convex);
+#ifdef DEBUG
+        std::cout << "convex: " << convex_area << " q:"
+                  << convex_area/area << std::endl;
+#endif
+        if (convex_area/area > 1.08) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 std::vector<contour> find_contours(const cv::Mat& in) {
