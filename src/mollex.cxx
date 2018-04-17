@@ -15,24 +15,26 @@ bool decide(std::vector<cv::Point2i> cont) {
     if (area < MINIMUM_AREA) {
         return true;
     }
-    std::cout << area << " b:" << brect_area << " " << quotient;
-#if 0
-    if (cont.size() >= 5 && 0) {
-        const cv::RotatedRect ell = cv::fitEllipse(cont);
-        const double ell_area = ell.size.area();
-        std::cout << " " << ell_area << " " << ell_area/area;
-    }
+#ifdef DEBUG
+    std::cout << area << " b:" << brect_area << " " << quotient << std::endl;
 #endif
-    std::cout << std::endl;
+
     return quotient < BOXINESS_CUTOFF_LO ||
            quotient > BOXINESS_CUTOFF_HI;
 }
 
 std::vector<std::vector<cv::Point2i>> find_contours(const cv::Mat& in) {
     std::vector<std::vector<cv::Point2i>> contours;
-    cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_TC89_L1);
-    contours.erase(std::remove_if(contours.begin(), contours.end(), decide), contours.end());
-    std::cout << "Found " << contours.size() << " potential molluscs" << std::endl;
+    cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+    contours.erase(
+        std::remove_if(contours.begin(), contours.end(), decide),
+        contours.end()
+    );
+
+#ifdef DEBUG
+    std::cout << "Found " << contours.size()
+              << " potential molluscs" << std::endl;
+#endif
 
     return contours;
 }
@@ -61,7 +63,9 @@ cv::Mat threshold(const cv::Mat& in) {
 
 #ifdef THRESHOLD
     const double threshold = determine_threshold(in);
+#ifdef DEBUG
     std::cout << "threshold: " << threshold << std::endl;
+#endif
     cv::threshold(tmp, tmp, threshold, 1.0, cv::THRESH_TOZERO);
 #endif
     tmp.convertTo(out, CV_8UC1, 255.0);
