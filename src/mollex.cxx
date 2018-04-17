@@ -156,7 +156,7 @@ void process(const char* img_fname) {
 
     const std::vector<contour> contours { find_contours(thresholded) };
     const cv::Scalar red { 0, 0, 255 };
-    cv::drawContours(img, contours, -1, red, 3);
+    cv::drawContours(img, contours, -1, red, 10);
 
     cv::imshow("in", img);
     cv::waitKey(0);
