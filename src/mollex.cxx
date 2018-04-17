@@ -26,6 +26,9 @@
 #define MORPH_MULTIPLE
 #define PREFILTER_GAUSSIAN
 
+#define MORPH_SINGLE_OPEN_ITERATIONS 5
+#define MORPH_SINGLE_CLOSE_ITERATIONS 0
+
 bool decide(std::vector<cv::Point2i> cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
@@ -112,8 +115,10 @@ void morphological_filtering(cv::Mat& img) {
     {
         const cv::Mat se { get_structuring_element(5) };
 
-        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
-        //cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 10);
+        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor,
+                         MORPH_SINGLE_OPEN_ITERATIONS);
+        cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor,
+                         MORPH_SINGLE_CLOSE_ITERATIONS);
     }
 #endif
 }
