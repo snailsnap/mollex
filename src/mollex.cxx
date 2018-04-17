@@ -147,7 +147,7 @@ void process(const char* img_fname) {
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "usage: %s <image>\n", argv[0]);
+        std::cerr << "usage: " << argv[0] << " <image>" << std::endl;
     }
 
     process(argv[1]);
