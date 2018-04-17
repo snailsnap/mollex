@@ -68,7 +68,7 @@ double determine_threshold(const cv::Mat& in) {
         }
     }
 
-    return (max_idx - 8.0) / 64.0;
+    return std::max(0.0, (max_idx / 64.0) + 0.06);
 }
 
 void threshold(const cv::Mat& in, cv::Mat& out) {
