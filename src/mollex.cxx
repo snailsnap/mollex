@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -8,6 +9,15 @@
 #include "tunables.h"
 
 using contour = std::vector<cv::Point2i>;
+
+#if !(__cplusplus >= 201703L)
+namespace std {
+template<typename T>
+constexpr const T& clamp(const T& val, const T& min, const T& max) {
+    return std::min(max, std::max(min, val));
+}
+}
+#endif
 
 bool decide(const contour& cont) {
     const double area = cv::contourArea(cont);
@@ -41,23 +51,29 @@ std::vector<contour> find_contours(const cv::Mat& in) {
     return contours;
 }
 
-double determine_threshold(const cv::Mat& in) {
-    cv::Mat blurred, hist;
- 
-    cv::GaussianBlur(in, blurred, cv::Size(3, 3), 0);
+double determine_threshold(const cv::Mat& img) {
+    cv::Mat hist, blurred;
+
+    assert(HIST_BUCKETS <= 8);
+    const int buckets = 1 << HIST_BUCKETS,
+              half_buckets = (1 << (HIST_BUCKETS - 1));
+    cv::GaussianBlur(img, blurred, cv::Size(5, 5), 20.0);
     cv::pyrDown(blurred, blurred);
-    cv::calcHist(std::vector<cv::Mat>{blurred}, std::vector<int>{0},
-        cv::Mat(), hist, std::vector<int>{64}, std::vector<float>{0.0, 1.0});
+    cv::calcHist(std::vector<cv::Mat>{ blurred }, std::vector<int>{ 0 },
+        cv::Mat(), hist, std::vector<int>{ buckets },
+        std::vector<float>{ 0.0, 1.0 }
+    );
 
     int max_idx = 0, max = 0;
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < half_buckets; i++) {
         if (hist.at<float>(i) > max) {
             max_idx = i;
             max = hist.at<float>(i);
         }
     }
 
-    return std::max(0.0, (max_idx / 64.0) + 0.06);
+    return std::clamp((max_idx / (double)buckets) + THRESHOLD_BIAS,
+                      0.0, 1.0);
 }
 
 cv::Mat threshold(const cv::Mat& in) {

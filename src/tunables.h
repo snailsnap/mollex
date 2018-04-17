@@ -24,6 +24,11 @@
  */
 #define THRESHOLD
 /*
+ * Constant added to the threshold prior to scaling, i.e. it should
+ * lie in [0;1].
+ */
+#define THRESHOLD_BIAS 0.06
+/*
  * Perform a single Gaussian blur prefiltering step.
  * NOTE: This is not known to noticeably improve contour detection
  * performance, however it is not known to harm either.
@@ -45,5 +50,9 @@
  */
 #define MORPH_SINGLE_OPEN_ITERATIONS 5
 #define MORPH_SINGLE_CLOSE_ITERATIONS 0
+/*
+ * Number of buckets to use for the histogram as a power of two.
+ */
+#define HIST_BUCKETS 6
 
 #endif
