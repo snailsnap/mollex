@@ -20,7 +20,10 @@
  * The minimum area occupied by a possible mollusc.
  */
 #define MINIMUM_AREA 1e5
+
 #define ENABLE_THRESHOLD 1
+#define MORPH_SINGLE
+#define MORPH_MULTIPLE
 
 bool decide(std::vector<cv::Point2i> cont) {
     const double area = cv::contourArea(cont);
@@ -86,22 +89,28 @@ cv::Mat get_structuring_element(const int order) {
 }
 
 void morphological_filtering(cv::Mat& img) {
-    const cv::Mat se { get_structuring_element(5) };
     const cv::Point2i anchor { -1, -1 };
-#if 0
+#ifdef MOPRH_MULTIPLE
     for (int i = 0; i < 10; i++) {
         const cv::Mat se = get_structuring_element(i);
-        cv::morphologyEx(tmp2, tmp2, cv::MORPH_OPEN, se, anchor, 1);
+        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 1);
     }
 
     for (int i = 0; i < 10; i++) {
         const cv::Mat se = get_structuring_element(i);
-        cv::morphologyEx(tmp2, tmp2, cv::MORPH_CLOSE, se, anchor, 1);
+        cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 1);
     }
 #endif
-    cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
-    cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 5);
-//  cv::morphologyEx(img, imt, cv::MORPH_GRADIENT, se, anchor, 1);
+
+#ifdef MORPH_SINGLE
+    {
+        const cv::Mat se { get_structuring_element(5) };
+
+        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
+        //cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 10);
+        //cv::morphologyEx(img, img, cv::MORPH_GRADIENT, se, anchor, 10);
+    }
+#endif
 }
 
 void process(const char* img_fname) {
