@@ -20,7 +20,8 @@
  * The minimum area occupied by a possible mollusc.
  */
 #define MINIMUM_AREA 1e5
-#define ENABLE_THRESHOLD 0
+#define ENABLE_THRESHOLD 1
+
 bool decide(std::vector<cv::Point2i> cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
@@ -85,7 +86,7 @@ cv::Mat get_structuring_element(const int order) {
 }
 
 void morphological_filtering(cv::Mat& img) {
-    const cv::Mat se { get_structuring_element(3) };
+    const cv::Mat se { get_structuring_element(5) };
     const cv::Point2i anchor { -1, -1 };
 #if 0
     for (int i = 0; i < 10; i++) {
@@ -98,8 +99,8 @@ void morphological_filtering(cv::Mat& img) {
         cv::morphologyEx(tmp2, tmp2, cv::MORPH_CLOSE, se, anchor, 1);
     }
 #endif
-    cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 8);
-    cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 2);
+    cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
+    cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 5);
 //  cv::morphologyEx(img, imt, cv::MORPH_GRADIENT, se, anchor, 1);
 }
 
@@ -112,8 +113,12 @@ void process(const char* img_fname) {
     cv::resizeWindow("eroded", 640, 480);
 
     const cv::Mat img = cv::imread(img_fname);
-    cv::Mat tmp, tmp2;
+    cv::Mat tmp, tmp2, filtered;
     cv::Mat hsv[3];
+    cv::pyrDown(img, tmp);
+//    cv::pyrDown(tmp, img);
+    cv::bilateralFilter(img, filtered, 9, 100, 100);
+
     img.convertTo(tmp, CV_32FC3, 1/255.0);
     cv::cvtColor(tmp, tmp, cv::COLOR_BGR2HSV, 3);
     cv::split(tmp, hsv);
