@@ -114,7 +114,6 @@ void morphological_filtering(cv::Mat& img) {
 
         cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
         //cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 10);
-        //cv::morphologyEx(img, img, cv::MORPH_GRADIENT, se, anchor, 10);
     }
 #endif
 }
