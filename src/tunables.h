@@ -19,6 +19,11 @@
  */
 #define MINIMUM_AREA 1e5
 /*
+ * The minimum smoothnes required of a potential molluscoid shape.
+ * A smoothness of 1.0 implies a shape without any convexity defects.
+ */
+#define CONTOUR_SMOOTHNESS_CUTOFF 1.08
+/*
  * Perform thresholding on the image.
  * The threshold is determined by considering the image's histogram.
  */

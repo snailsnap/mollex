@@ -43,7 +43,7 @@ bool decide(const contour& cont) {
         std::cout << "convex: " << convex_area << " q:"
                   << convex_area/area << std::endl;
 #endif
-        if (convex_area/area > 1.08) {
+        if (convex_area/area > CONTOUR_SMOOTHNESS_CUTOFF) {
             return true;
         }
     }
