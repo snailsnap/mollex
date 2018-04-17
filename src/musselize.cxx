@@ -15,7 +15,7 @@
  * shape that we are not interested in.
  */
 #define BOXINESS_CUTOFF_LO 1.18
-#define BOXINESS_CUTOFF_HI 1.5
+#define BOXINESS_CUTOFF_HI 1.8
 /*
  * The minimum area occupied by a possible mollusc.
  */
