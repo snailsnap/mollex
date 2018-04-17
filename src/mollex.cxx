@@ -21,9 +21,10 @@
  */
 #define MINIMUM_AREA 1e5
 
-#define ENABLE_THRESHOLD 1
+#define THRESHOLD
 #define MORPH_SINGLE
 #define MORPH_MULTIPLE
+#define PREFILTER_GAUSSIAN
 
 bool decide(std::vector<cv::Point2i> cont) {
     const double area = cv::contourArea(cont);
@@ -74,13 +75,18 @@ double determine_threshold(const cv::Mat& in) {
     return std::max(0.0, (max_idx / 64.0) + 0.06);
 }
 
-void threshold(const cv::Mat& in, cv::Mat& out) {
-    cv::Mat tmp = in.clone();
+cv::Mat threshold(const cv::Mat& in) {
+    cv::Mat out, tmp = in.clone();
+
+#ifdef THRESHOLD
     const double threshold = determine_threshold(in);
     std::cout << "threshold: " << threshold << std::endl;
-    cv::threshold(tmp, tmp, ENABLE_THRESHOLD ? threshold : 0, 1.0, cv::THRESH_TOZERO);
+    cv::threshold(tmp, tmp, threshold, 1.0, cv::THRESH_TOZERO);
+#endif
     tmp.convertTo(out, CV_8UC1, 255.0);
     cv::compare(out, 0, out, cv::CMP_GT);
+
+    return out;
 }
 
 cv::Mat get_structuring_element(const int order) {
@@ -113,6 +119,20 @@ void morphological_filtering(cv::Mat& img) {
 #endif
 }
 
+cv::Mat prefilter(cv::Mat in) {
+    cv::Mat tmp, filtered;
+#ifdef PREFILTER_GAUSSIAN
+    cv::GaussianBlur(in, in, cv::Size { 5, 5 }, 10.0);
+#endif
+    cv::bilateralFilter(in, filtered, 9, 100, 100);
+    cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
+
+    tmp.convertTo(tmp, CV_32FC3, 1/255.0);
+    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
+
+    return tmp;
+}
+
 void process(const char* img_fname) {
     cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
     cv::resizeWindow("in", 640, 480);
@@ -122,25 +142,20 @@ void process(const char* img_fname) {
     cv::resizeWindow("eroded", 640, 480);
 
     const cv::Mat img = cv::imread(img_fname);
-    cv::Mat tmp, tmp2, filtered;
-    cv::Mat hsv[3];
-    cv::bilateralFilter(img, filtered, 9, 100, 100);
-    cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
+    const cv::Mat filtered = prefilter(img);
+    cv::Mat thresholded = threshold(filtered);
+    cv::imshow("out", thresholded);
+   
+    morphological_filtering(thresholded);
+    cv::imshow("eroded", thresholded);
 
-    tmp.convertTo(tmp, CV_32FC3, 1/255.0);
-    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
-
-    threshold(tmp, tmp2);
-    cv::imshow("out", tmp2);
-//  cv::Canny(tmp2, tmp2, 25, 40);
-    morphological_filtering(tmp2);
-
-    std::vector<std::vector<cv::Point2i>> contours { find_contours(tmp2) };
+    const std::vector<std::vector<cv::Point2i>> contours {
+        find_contours(thresholded)
+    };
     const cv::Scalar red { 0, 0, 255 };
     cv::drawContours(img, contours, -1, red, 3);
 
     cv::imshow("in", img);
-    cv::imshow("eroded", tmp2);
     cv::waitKey(0);
 }
 
