@@ -4,7 +4,6 @@
 #include <algorithm>
 
 #include <opencv/cv.hpp>
-//#include <opencv/highgui.hpp>
 
 // ### TUNABLES ###
 /*
