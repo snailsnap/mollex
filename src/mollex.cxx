@@ -125,10 +125,11 @@ void morphological_filtering(cv::Mat& img) {
 
 cv::Mat prefilter(cv::Mat in) {
     cv::Mat tmp, filtered;
-#ifdef PREFILTER_GAUSSIAN
-    cv::GaussianBlur(in, in, cv::Size { 5, 5 }, 10.0);
-#endif
+
     cv::bilateralFilter(in, filtered, 9, 100, 100);
+#ifdef PREFILTER_GAUSSIAN
+    cv::GaussianBlur(filtered, filtered, cv::Size { 5, 5 }, 10.0);
+#endif
     cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
 
     tmp.convertTo(tmp, CV_32FC3, 1/255.0);
