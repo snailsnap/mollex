@@ -124,15 +124,13 @@ void process(const char* img_fname) {
     const cv::Mat img = cv::imread(img_fname);
     cv::Mat tmp, tmp2, filtered;
     cv::Mat hsv[3];
-    cv::pyrDown(img, tmp);
-//    cv::pyrDown(tmp, img);
     cv::bilateralFilter(img, filtered, 9, 100, 100);
+    cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
 
-    img.convertTo(tmp, CV_32FC3, 1/255.0);
-    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2HSV, 3);
-    cv::split(tmp, hsv);
+    tmp.convertTo(tmp, CV_32FC3, 1/255.0);
+    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
 
-    threshold(hsv[1], tmp2);
+    threshold(tmp, tmp2);
     cv::imshow("out", tmp2);
 //  cv::Canny(tmp2, tmp2, 25, 40);
     morphological_filtering(tmp2);
