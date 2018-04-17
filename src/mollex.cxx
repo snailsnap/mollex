@@ -7,7 +7,9 @@
 
 #include "tunables.h"
 
-bool decide(std::vector<cv::Point2i> cont) {
+using contour = std::vector<cv::Point2i>;
+
+bool decide(const contour& cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
     const double brect_area = brect.size.area();
@@ -23,8 +25,8 @@ bool decide(std::vector<cv::Point2i> cont) {
            quotient > BOXINESS_CUTOFF_HI;
 }
 
-std::vector<std::vector<cv::Point2i>> find_contours(const cv::Mat& in) {
-    std::vector<std::vector<cv::Point2i>> contours;
+std::vector<contour> find_contours(const cv::Mat& in) {
+    std::vector<contour> contours;
     cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
     contours.erase(
         std::remove_if(contours.begin(), contours.end(), decide),
@@ -135,9 +137,7 @@ void process(const char* img_fname) {
     morphological_filtering(thresholded);
     cv::imshow("eroded", thresholded);
 
-    const std::vector<std::vector<cv::Point2i>> contours {
-        find_contours(thresholded)
-    };
+    const std::vector<contour> contours { find_contours(thresholded) };
     const cv::Scalar red { 0, 0, 255 };
     cv::drawContours(img, contours, -1, red, 3);
 
