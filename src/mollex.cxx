@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -5,28 +6,21 @@
 #include <fstream>
 
 #include <opencv/cv.hpp>
-//#include <opencv/highgui.hpp>
 
-// ### TUNABLES ###
-/*
- * Boxiness is the area of the fitted rectangle divided through
- * the area of the actual contour.
- * A low boxiness value (near 1.0) indicates a very box-like shape.
- * A high boxiness value (greater than 2.0) indicates a very chaotic
- * shape that we are not interested in.
- */
-#define BOXINESS_CUTOFF_LO 1.18
-#define BOXINESS_CUTOFF_HI 1.8
-/*
- * The minimum area occupied by a possible mollusc.
- */
-#define MINIMUM_AREA 1e5
+#include "tunables.h"
 
-#define ENABLE_THRESHOLD 1
-#define MORPH_SINGLE
-#define MORPH_MULTIPLE
+using contour = std::vector<cv::Point2i>;
 
-bool decide(std::vector<cv::Point2i> cont) {
+#if !(__cplusplus >= 201703L)
+namespace std {
+template<typename T>
+constexpr const T& clamp(const T& val, const T& min, const T& max) {
+    return std::min(max, std::max(min, val));
+}
+}
+#endif
+
+bool decide(const contour& cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
     const double brect_area = brect.size.area();
@@ -34,54 +28,85 @@ bool decide(std::vector<cv::Point2i> cont) {
     if (area < MINIMUM_AREA) {
         return true;
     }
-    std::cout << area << " b:" << brect_area << " " << quotient;
-#if 0
-    if (cont.size() >= 5 && 0) {
-        const cv::RotatedRect ell = cv::fitEllipse(cont);
-        const double ell_area = ell.size.area();
-        std::cout << " " << ell_area << " " << ell_area/area;
-    }
+#ifdef DEBUG
+    std::cout << area << " b:" << brect_area << " " << quotient << std::endl;
 #endif
-    std::cout << std::endl;
-    return quotient < BOXINESS_CUTOFF_LO ||
-           quotient > BOXINESS_CUTOFF_HI;
+
+    if (quotient < BOXINESS_CUTOFF_LO ||
+        quotient > BOXINESS_CUTOFF_HI) {
+        return true;
+    }
+    {
+        contour convex;
+        cv::convexHull(cont, convex);
+        const double convex_area = cv::contourArea(convex);
+#ifdef DEBUG
+        std::cout << "convex: " << convex_area << " q:"
+                  << convex_area/area << std::endl;
+#endif
+        if (convex_area/area > CONTOUR_SMOOTHNESS_CUTOFF) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-std::vector<std::vector<cv::Point2i>> find_contours(const cv::Mat& in) {
-    std::vector<std::vector<cv::Point2i>> contours;
-    cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_TC89_L1);
-    contours.erase(std::remove_if(contours.begin(), contours.end(), decide), contours.end());
-    std::cout << "Found " << contours.size() << " potential molluscs" << std::endl;
+std::vector<contour> find_contours(const cv::Mat& in) {
+    std::vector<contour> contours;
+    cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+    contours.erase(
+        std::remove_if(contours.begin(), contours.end(), decide),
+        contours.end()
+    );
+
+#ifdef DEBUG
+    std::cout << "Found " << contours.size()
+              << " potential molluscs" << std::endl;
+#endif
 
     return contours;
 }
 
-double determine_threshold(const cv::Mat& in) {
-    cv::Mat blurred, hist;
- 
-    cv::GaussianBlur(in, blurred, cv::Size(3, 3), 0);
+double determine_threshold(const cv::Mat& img) {
+    cv::Mat hist, blurred;
+
+    assert(HIST_BUCKETS <= 8);
+    const int buckets = 1 << HIST_BUCKETS,
+              half_buckets = (1 << (HIST_BUCKETS - 1));
+    cv::GaussianBlur(img, blurred, cv::Size(5, 5), 20.0);
     cv::pyrDown(blurred, blurred);
-    cv::calcHist(std::vector<cv::Mat>{blurred}, std::vector<int>{0},
-        cv::Mat(), hist, std::vector<int>{64}, std::vector<float>{0.0, 1.0});
+    cv::calcHist(std::vector<cv::Mat>{ blurred }, std::vector<int>{ 0 },
+        cv::Mat(), hist, std::vector<int>{ buckets },
+        std::vector<float>{ 0.0, 1.0 }
+    );
 
     int max_idx = 0, max = 0;
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < half_buckets; i++) {
         if (hist.at<float>(i) > max) {
             max_idx = i;
             max = hist.at<float>(i);
         }
     }
 
-    return std::max(0.0, (max_idx / 64.0) + 0.06);
+    return std::clamp((max_idx / (double)buckets) + THRESHOLD_BIAS,
+                      0.0, 1.0);
 }
 
-void threshold(const cv::Mat& in, cv::Mat& out) {
-    cv::Mat tmp = in.clone();
+cv::Mat threshold(const cv::Mat& in) {
+    cv::Mat out, tmp = in.clone();
+
+#ifdef THRESHOLD
     const double threshold = determine_threshold(in);
+#ifdef DEBUG
     std::cout << "threshold: " << threshold << std::endl;
-    cv::threshold(tmp, tmp, ENABLE_THRESHOLD ? threshold : 0, 1.0, cv::THRESH_TOZERO);
+#endif
+    cv::threshold(tmp, tmp, threshold, 1.0, cv::THRESH_TOZERO);
+#endif
     tmp.convertTo(out, CV_8UC1, 255.0);
     cv::compare(out, 0, out, cv::CMP_GT);
+
+    return out;
 }
 
 cv::Mat get_structuring_element(const int order) {
@@ -107,11 +132,27 @@ void morphological_filtering(cv::Mat& img) {
     {
         const cv::Mat se { get_structuring_element(5) };
 
-        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor, 5);
-        //cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor, 10);
-        //cv::morphologyEx(img, img, cv::MORPH_GRADIENT, se, anchor, 10);
+        cv::morphologyEx(img, img, cv::MORPH_OPEN, se, anchor,
+                         MORPH_SINGLE_OPEN_ITERATIONS);
+        cv::morphologyEx(img, img, cv::MORPH_CLOSE, se, anchor,
+                         MORPH_SINGLE_CLOSE_ITERATIONS);
     }
 #endif
+}
+
+cv::Mat prefilter(cv::Mat in) {
+    cv::Mat tmp, filtered;
+
+    cv::bilateralFilter(in, filtered, 9, 100, 100);
+    cv::GaussianBlur(filtered, filtered, cv::Size { 5, 5 }, 10.0);
+#ifdef PREFILTER_GAUSSIAN
+#endif
+    cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
+
+    tmp.convertTo(tmp, CV_32FC3, 1/255.0);
+    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
+
+	return tmp;
 }
 
 void process(std::string img_fname, std::string inDir, std::string outDir) {
@@ -119,30 +160,18 @@ void process(std::string img_fname, std::string inDir, std::string outDir) {
 	std::string imageName;
 	std::getline(ss, imageName);
     const cv::Mat img = cv::imread(inDir + "/" + img_fname);
-    cv::Mat tmp, tmp2, filtered;
-    cv::Mat hsv[3];
-    cv::bilateralFilter(img, filtered, 9, 100, 100);
-    cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
+    const cv::Mat filtered = prefilter(img);
+    cv::Mat thresholded = threshold(filtered);
+   
+    morphological_filtering(thresholded);
 
-    tmp.convertTo(tmp, CV_32FC3, 1/255.0);
-    cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
-
-    threshold(tmp, tmp2);
-    //cv::imshow("out", tmp2);
-//  cv::Canny(tmp2, tmp2, 25, 40);
-    morphological_filtering(tmp2);
-
-    std::vector<std::vector<cv::Point2i>> contours { find_contours(tmp2) };
+    const std::vector<contour> contours { find_contours(thresholded) };
     const cv::Scalar red { 0, 0, 255 };
-
 	std::vector<cv::Mat> channels(3);
 	cv::split(img, channels);
-	channels.push_back(tmp2);
-	std::cout << "layer count: " << channels.size() << std::endl;
-
+	channels.push_back(thresholded);
 	cv::Mat outImage;
 	cv::merge(channels, outImage);
-
 	int i = 0;
 	for (auto contour : contours) {
 		auto boundingBox = cv::boundingRect(contour);
@@ -150,21 +179,12 @@ void process(std::string img_fname, std::string inDir, std::string outDir) {
 		auto segment = cv::Mat(outImage, boundingBox).clone();
 		cv::imwrite(outDir + "/" + imageName + "_" + std::to_string(i++)  + ".png", segment);
 	}
-
-	//cv::imwrite(outDir + "/" + img_fname + ".png", outImage);
-    cv::drawContours(img, contours, -1, red, 3);
     cv::imshow("in", img);
-    //cv::imshow("eroded", tmp2);
-    cv::waitKey(1000);
 }
 
 int main(int argc, char **argv) {
 	cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
 	cv::resizeWindow("in", 640, 480);
-	/*cv::namedWindow("out", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-	cv::resizeWindow("out", 640, 480);
-	cv::namedWindow("eroded", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-	cv::resizeWindow("eroded", 640, 480);/**/
 
 	std::ifstream oldMetaFile("species_list.csv");
 	std::string line;
@@ -179,29 +199,18 @@ int main(int argc, char **argv) {
 			for (auto i = (size_t)0; i < 13; ++i) {
 				std::getline(ss, entry, ';');
 				data.push_back(entry);
-				//std::cout << entry << "|";
 			}
 			std::getline(ss, entry, ';');//Hackathon download Link
 
 			//read image names
 			while (std::getline(ss, entry, ';')) {
 				if (entry != "") {
-					//std::cout << "image path: <images/" << entry << ">" << std::endl;
 					process(entry, "images", "outImages");
 				}
 			}
 			lineNr++;
 		}
 	}
-
-
-
-
-    /*if (argc != 2) {
-        fprintf(stderr, "usage: %s <image>\n", argv[0]);
-    }/**/
-
-    //process(argv[1]);
 
     return EXIT_SUCCESS;
 }
