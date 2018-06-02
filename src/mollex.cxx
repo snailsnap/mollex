@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <fstream>
 
 #include <opencv/cv.hpp>
 //#include <opencv/highgui.hpp>
@@ -113,15 +114,11 @@ void morphological_filtering(cv::Mat& img) {
 #endif
 }
 
-void process(const char* img_fname) {
-    cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-    cv::resizeWindow("in", 640, 480);
-    cv::namedWindow("out", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-    cv::resizeWindow("out", 640, 480);
-    cv::namedWindow("eroded", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-    cv::resizeWindow("eroded", 640, 480);
-
-    const cv::Mat img = cv::imread(img_fname);
+void process(std::string img_fname, std::string inDir, std::string outDir) {
+	auto ss = std::stringstream(img_fname);
+	std::string imageName;
+	std::getline(ss, imageName);
+    const cv::Mat img = cv::imread(inDir + "/" + img_fname);
     cv::Mat tmp, tmp2, filtered;
     cv::Mat hsv[3];
     cv::bilateralFilter(img, filtered, 9, 100, 100);
@@ -131,25 +128,80 @@ void process(const char* img_fname) {
     cv::cvtColor(tmp, tmp, cv::COLOR_BGR2GRAY, 1);
 
     threshold(tmp, tmp2);
-    cv::imshow("out", tmp2);
+    //cv::imshow("out", tmp2);
 //  cv::Canny(tmp2, tmp2, 25, 40);
     morphological_filtering(tmp2);
 
     std::vector<std::vector<cv::Point2i>> contours { find_contours(tmp2) };
     const cv::Scalar red { 0, 0, 255 };
-    cv::drawContours(img, contours, -1, red, 3);
 
+	std::vector<cv::Mat> channels(3);
+	cv::split(img, channels);
+	channels.push_back(tmp2);
+	std::cout << "layer count: " << channels.size() << std::endl;
+
+	cv::Mat outImage;
+	cv::merge(channels, outImage);
+
+	int i = 0;
+	for (auto contour : contours) {
+		auto boundingBox = cv::boundingRect(contour);
+		std::cout << "rect: " << boundingBox << std::endl;
+		auto segment = cv::Mat(outImage, boundingBox).clone();
+		cv::imwrite(outDir + "/" + imageName + "_" + std::to_string(i++)  + ".png", segment);
+	}
+
+	//cv::imwrite(outDir + "/" + img_fname + ".png", outImage);
+    cv::drawContours(img, contours, -1, red, 3);
     cv::imshow("in", img);
-    cv::imshow("eroded", tmp2);
-    cv::waitKey(0);
+    //cv::imshow("eroded", tmp2);
+    cv::waitKey(1000);
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s <image>\n", argv[0]);
-    }
+	cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
+	cv::resizeWindow("in", 640, 480);
+	/*cv::namedWindow("out", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
+	cv::resizeWindow("out", 640, 480);
+	cv::namedWindow("eroded", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
+	cv::resizeWindow("eroded", 640, 480);/**/
 
-    process(argv[1]);
+	std::ifstream oldMetaFile("species_list.csv");
+	std::string line;
+	if (oldMetaFile.is_open()) {
+		int lineNr = 1;
+		std::getline(oldMetaFile, line);
+		while (std::getline(oldMetaFile, line) && lineNr == 1) {
+			std::cout << "line " << lineNr << std::endl;
+			std::vector<std::string> data;
+			std::stringstream ss(line);
+			std::string entry;
+			for (auto i = (size_t)0; i < 13; ++i) {
+				std::getline(ss, entry, ';');
+				data.push_back(entry);
+				//std::cout << entry << "|";
+			}
+			std::getline(ss, entry, ';');//Hackathon download Link
+
+			//read image names
+			while (std::getline(ss, entry, ';')) {
+				if (entry != "") {
+					//std::cout << "image path: <images/" << entry << ">" << std::endl;
+					process(entry, "images", "outImages");
+				}
+			}
+			lineNr++;
+		}
+	}
+
+
+
+
+    /*if (argc != 2) {
+        fprintf(stderr, "usage: %s <image>\n", argv[0]);
+    }/**/
+
+    //process(argv[1]);
 
     return EXIT_SUCCESS;
 }
