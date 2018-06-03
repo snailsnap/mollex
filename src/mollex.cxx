@@ -155,11 +155,8 @@ cv::Mat prefilter(cv::Mat in) {
 	return tmp;
 }
 
-void process(std::string img_fname, std::string inDir, std::string outDir) {
-	auto ss = std::stringstream(img_fname);
-	std::string imageName;
-	std::getline(ss, imageName);
-    const cv::Mat img = cv::imread(inDir + "/" + img_fname);
+std::vector<cv::Mat>* process(std::string imageName, std::string inDir) {
+    const cv::Mat img = cv::imread(inDir + "/" + imageName + ".jpg");
     const cv::Mat filtered = prefilter(img);
     cv::Mat thresholded = threshold(filtered);
    
@@ -173,22 +170,47 @@ void process(std::string img_fname, std::string inDir, std::string outDir) {
 	cv::Mat outImage;
 	cv::merge(channels, outImage);
 	int i = 0;
+	auto images = new std::vector<cv::Mat>;
 	for (auto contour : contours) {
 		auto boundingBox = cv::boundingRect(contour);
-		std::cout << "rect: " << boundingBox << std::endl;
-		auto segment = cv::Mat(outImage, boundingBox).clone();
-		cv::imwrite(outDir + "/" + imageName + "_" + std::to_string(i++)  + ".png", segment);
+		auto segment = (new cv::Mat(outImage, boundingBox))->clone();
+		images->push_back(segment);
 	}
-    cv::imshow("in", img);
+    //cv::imshow("in", img);
+	return images;
+}
+
+std::string getColor(cv::Mat image) {
+	cv::MatIterator_<cv::Vec4b> start, end;
+	auto r = 0.0;
+	auto g = 0.0;
+	auto b = 0.0;
+	auto a = 0.0;
+	for (auto it = image.begin<cv::Vec4b>(), end = image.end<cv::Vec4b>(); it != end; ++it)
+	{
+		b += (*it)[3] * (*it)[0];
+		g += (*it)[3] * (*it)[1];
+		r += (*it)[3] * (*it)[2];
+		a += (*it)[3];
+	}
+	int ri = r / a;
+	int gi = g / a;
+	int bi = b / a;
+	auto ss = std::stringstream();
+	ss << std::hex << (ri<=0xf?"0":"") << ri << (gi <= 0xf ? "0" : "") << gi << (bi <= 0xf ? "0" : "") << bi;
+	return ss.str();
 }
 
 int main(int argc, char **argv) {
-	cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
-	cv::resizeWindow("in", 640, 480);
+	/*cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
+	cv::resizeWindow("in", 640, 480);/**/
 
 	std::ifstream oldMetaFile("species_list.csv");
+	std::ofstream newMetaFile("meta_file.csv");
+	newMetaFile << "Image;Color;Rotation;Ratio;OriginalImage;InventarNr;Class;Family;Genus;Species;Scientific Name;Fundort;Datum;Gebiet;Provinz;Land;Teilkontinent;Kontinent" << std::endl;
+	
 	std::string line;
-	if (oldMetaFile.is_open()) {
+	if (oldMetaFile.is_open() && newMetaFile.is_open()) {
 		int lineNr = 1;
 		std::getline(oldMetaFile, line);
 		while (std::getline(oldMetaFile, line) && lineNr == 1) {
@@ -205,11 +227,32 @@ int main(int argc, char **argv) {
 			//read image names
 			while (std::getline(ss, entry, ';')) {
 				if (entry != "") {
-					process(entry, "images", "outImages");
+					auto ss1 = std::stringstream(entry);
+					std::string imageName;
+					std::getline(ss1, imageName, '.');
+					auto images = process(imageName, "images");
+					int i = 0;
+					for (auto &image : *images) {
+						cv::imwrite("outImages/" + imageName + "_" + std::to_string(i) + ".png", image);
+						newMetaFile << imageName << "_" << i << ".png;";
+						newMetaFile << "#" << getColor(image) << ";";
+						newMetaFile << "0.0;";
+						newMetaFile << "1.0;";
+						newMetaFile << imageName << ".jpg";
+						
+						for (auto d : data) {
+							newMetaFile << ";" << d;
+						}
+						newMetaFile << std::endl;
+						i++;
+					}
 				}
 			}
 			lineNr++;
 		}
+
+		oldMetaFile.close();
+		newMetaFile.close();
 	}
 
     return EXIT_SUCCESS;
