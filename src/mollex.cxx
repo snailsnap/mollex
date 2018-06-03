@@ -156,7 +156,9 @@ cv::Mat prefilter(cv::Mat in) {
 }
 
 std::vector<cv::Mat>* process(std::string imageName, std::string inDir) {
+    auto images = new std::vector<cv::Mat>;
     const cv::Mat img = cv::imread(inDir + "/" + imageName + ".jpg");
+    if (!img.data) return images;
     const cv::Mat filtered = prefilter(img);
     cv::Mat thresholded = threshold(filtered);
    
@@ -170,10 +172,9 @@ std::vector<cv::Mat>* process(std::string imageName, std::string inDir) {
 	cv::Mat outImage;
 	cv::merge(channels, outImage);
 	int i = 0;
-	auto images = new std::vector<cv::Mat>;
 	for (auto contour : contours) {
 		auto boundingBox = cv::boundingRect(contour);
-		auto segment = (new cv::Mat(outImage, boundingBox))->clone();
+		auto segment = cv::Mat(outImage, boundingBox).clone();
 		images->push_back(segment);
 	}
     //cv::imshow("in", img);
@@ -205,55 +206,65 @@ int main(int argc, char **argv) {
 	/*cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
 	cv::resizeWindow("in", 640, 480);/**/
 
-	std::ifstream oldMetaFile("species_list.csv");
-	std::ofstream newMetaFile("meta_file.csv");
-	newMetaFile << "Image;Color;Rotation;Ratio;OriginalImage;InventarNr;Class;Family;Genus;Species;Scientific Name;Fundort;Datum;Gebiet;Provinz;Land;Teilkontinent;Kontinent" << std::endl;
-	
+	std::ifstream oldMetaFile("species_list.csv");	
 	std::string line;
-	if (oldMetaFile.is_open() && newMetaFile.is_open()) {
-		int lineNr = 1;
-		std::getline(oldMetaFile, line);
-		while (std::getline(oldMetaFile, line) && lineNr == 1) {
-			std::cout << "line " << lineNr << std::endl;
-			std::vector<std::string> data;
-			std::stringstream ss(line);
-			std::string entry;
-			for (auto i = (size_t)0; i < 13; ++i) {
-				std::getline(ss, entry, ';');
-				data.push_back(entry);
-			}
-			std::getline(ss, entry, ';');//Hackathon download Link
+    if (!oldMetaFile.is_open()) {
+        std::cerr << "Can not open species_list.csv" << std::endl;
+        return EXIT_FAILURE;
+    }
 
-			//read image names
-			while (std::getline(ss, entry, ';')) {
-				if (entry != "") {
-					auto ss1 = std::stringstream(entry);
-					std::string imageName;
-					std::getline(ss1, imageName, '.');
-					auto images = process(imageName, "images");
-					int i = 0;
-					for (auto &image : *images) {
-						cv::imwrite("outImages/" + imageName + "_" + std::to_string(i) + ".png", image);
-						newMetaFile << imageName << "_" << i << ".png;";
-						newMetaFile << "#" << getColor(image) << ";";
-						newMetaFile << "0.0;";
-						newMetaFile << "1.0;";
-						newMetaFile << imageName << ".jpg";
-						
-						for (auto d : data) {
-							newMetaFile << ";" << d;
-						}
-						newMetaFile << std::endl;
-						i++;
-					}
-				}
-			}
-			lineNr++;
+	std::ofstream newMetaFile("data/meta_file.csv");
+    if (!newMetaFile.is_open()) {
+        std::cerr << "Can not create data/meta_file.csv" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    newMetaFile << "Image;Color;Rotation;Ratio;OriginalImage;InventarNr;Class;Family;Genus;Species;Scientific Name;Fundort;Datum;Gebiet;Provinz;Land;Teilkontinent;Kontinent" << std::endl;
+
+	int lineNr = 1;
+	std::getline(oldMetaFile, line);
+	while (std::getline(oldMetaFile, line)) {
+		std::cout << "line " << lineNr << std::endl;
+		std::vector<std::string> data;
+		std::stringstream ss(line);
+		std::string entry;
+		for (auto i = (size_t)0; i < 13; ++i) {
+			std::getline(ss, entry, ';');
+			data.push_back(entry);
 		}
+		std::getline(ss, entry, ';');//Hackathon download Link
 
-		oldMetaFile.close();
-		newMetaFile.close();
+		//read image names
+		while (std::getline(ss, entry, ';')) {
+			if (entry != "") {
+				auto ss1 = std::stringstream(entry);
+				std::string imageName;
+				std::getline(ss1, imageName, '.');
+				auto images = process(imageName, "images");
+				int i = 0;
+				for (auto image : *images) {
+					cv::imwrite("data/" + imageName + "_" + std::to_string(i) + ".png", image);
+					newMetaFile << imageName << "_" << i << ".png;";
+					newMetaFile << "#" << getColor(image) << ";";
+					newMetaFile << "0.0;";
+					newMetaFile << "1.0;";
+					newMetaFile << imageName << ".jpg";
+						
+					for (auto d : data) {
+						newMetaFile << ";" << d;
+					}
+					newMetaFile << std::endl;
+
+					i++;
+				}
+                delete images;
+			}
+		}
+		lineNr++;
 	}
+
+	oldMetaFile.close();
+	newMetaFile.close();
 
     return EXIT_SUCCESS;
 }
