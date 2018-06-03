@@ -16,6 +16,8 @@
 
 using contour = std::vector<cv::Point2i>;
 
+const int32_t downsampling_width = 256;
+
 #if !(__cplusplus >= 201703L)
 namespace std {
 template<typename T>
@@ -189,6 +191,8 @@ std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
 		cv::Mat outImage;
 		cv::merge(channels, outImage);
 		auto segment = cv::Mat(outImage, boundingBox).clone();
+		const auto scale_factor = (boundingBox.size().width >= downsampling_width) ? downsampling_width/(double)boundingBox.size().width : 1.0;
+		cv::resize(segment, segment, cv::Size{}, scale_factor, scale_factor, cv::INTER_AREA);
 		images.push_back(segment);
 	}
 	return images;
