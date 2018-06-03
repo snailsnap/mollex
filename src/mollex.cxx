@@ -155,8 +155,9 @@ cv::Mat prefilter(cv::Mat in) {
 	return tmp;
 }
 
-std::vector<cv::Mat>* process(std::string imageName, std::string inDir) {
-    auto images = new std::vector<cv::Mat>;
+std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
+    std::vector<cv::Mat> images;
+
     const cv::Mat img = cv::imread(inDir + "/" + imageName + ".jpg");
     if (!img.data) return images;
     const cv::Mat filtered = prefilter(img);
@@ -175,9 +176,8 @@ std::vector<cv::Mat>* process(std::string imageName, std::string inDir) {
 	for (auto contour : contours) {
 		auto boundingBox = cv::boundingRect(contour);
 		auto segment = cv::Mat(outImage, boundingBox).clone();
-		images->push_back(segment);
+		images.push_back(segment);
 	}
-    //cv::imshow("in", img);
 	return images;
 }
 
@@ -202,6 +202,49 @@ std::string getColor(cv::Mat image) {
 	return ss.str();
 }
 
+void write_image(const std::string& imageName, const std::string& data, std::ostream& newMetaFile) {
+	const auto images = process(imageName, "images");
+	int i = 0;
+	for (auto image : images) {
+		const std::string fname { imageName + "_" + std::to_string(i) + ".png" };
+		cv::imwrite("data/" + fname, image);
+		newMetaFile << fname << ";";
+		newMetaFile << "#" << getColor(image) << ";";
+		newMetaFile << "0.0;";
+		newMetaFile << "1.0;";
+		newMetaFile << imageName << ".jpg";
+			
+		for (auto d : data) {
+			newMetaFile << ";" << d;
+		}
+		newMetaFile << std::endl;
+
+		i++;
+	}
+}
+
+void process_line(const std::string& line, std::ostream& newMetaFile) {
+	std::string data;
+	std::stringstream ss(line);
+	std::string entry;
+	for (auto i = (size_t)0; i < 13; ++i) {
+		std::getline(ss, entry, ';');
+		data += entry;
+	}
+	std::getline(ss, entry, ';');//Hackathon download Link
+
+	//read image names
+	#pragma omp for
+	while (std::getline(ss, entry, ';')) {
+		if (entry != "") {
+			auto ss1 = std::stringstream(entry);
+			std::string imageName;
+			std::getline(ss1, imageName, '.');
+			write_image(imageName, data, newMetaFile);
+		}
+	}
+}
+
 int main(int argc, char **argv) {
 	/*cv::namedWindow("in", cv::WINDOW_NORMAL | cv::WINDOW_GUI_NORMAL);
 	cv::resizeWindow("in", 640, 480);/**/
@@ -223,43 +266,12 @@ int main(int argc, char **argv) {
 
 	int lineNr = 1;
 	std::getline(oldMetaFile, line);
+
+	#pragma omp parallel
 	while (std::getline(oldMetaFile, line)) {
 		std::cout << "line " << lineNr << std::endl;
-		std::vector<std::string> data;
-		std::stringstream ss(line);
-		std::string entry;
-		for (auto i = (size_t)0; i < 13; ++i) {
-			std::getline(ss, entry, ';');
-			data.push_back(entry);
-		}
-		std::getline(ss, entry, ';');//Hackathon download Link
-
-		//read image names
-		while (std::getline(ss, entry, ';')) {
-			if (entry != "") {
-				auto ss1 = std::stringstream(entry);
-				std::string imageName;
-				std::getline(ss1, imageName, '.');
-				auto images = process(imageName, "images");
-				int i = 0;
-				for (auto image : *images) {
-					cv::imwrite("data/" + imageName + "_" + std::to_string(i) + ".png", image);
-					newMetaFile << imageName << "_" << i << ".png;";
-					newMetaFile << "#" << getColor(image) << ";";
-					newMetaFile << "0.0;";
-					newMetaFile << "1.0;";
-					newMetaFile << imageName << ".jpg";
-						
-					for (auto d : data) {
-						newMetaFile << ";" << d;
-					}
-					newMetaFile << std::endl;
-
-					i++;
-				}
-                delete images;
-			}
-		}
+		#pragma omp for
+		process_line(line, newMetaFile);
 		lineNr++;
 	}
 
