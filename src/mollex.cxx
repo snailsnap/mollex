@@ -5,6 +5,11 @@
 #include <algorithm>
 #include <fstream>
 
+#include <mutex>
+#include <atomic>
+#include <thread>
+#include <chrono>
+
 #include <opencv/cv.hpp>
 
 #include "tunables.h"
@@ -271,13 +276,32 @@ int main(int argc, char **argv) {
 		lines.emplace_back(line);
 	}
 
+    std::atomic<int> lines_processed = 0;
+
+    const auto print_progress = [&] {
+        while (lines_processed != lines.size()) {
+            std::cout
+                << lines_processed << "/" << lines.size() 
+                << " " << lines_processed/(double)lines.size() * 100 << "%"
+                << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds{ 2 });
+        }
+    };
+    std::thread progress_thread{ print_progress };
+
+    std::mutex mtx;
 	#pragma omp parallel for
-	for (auto it = lines.cbegin(); it != lines.cend(); it++) {
-		std::cout << "line " << lineNr << std::endl;
-		process_line(*it, newMetaFile);
-		lineNr++;
+    for (int i = 0; i < lines.size(); i++) {   
+        if (0) {
+            std::lock_guard<std::mutex> guard{ mtx };
+            std::cout << "line " << lineNr << std::endl;
+            lineNr++;
+        }
+        process_line(lines[i], newMetaFile);
+        lines_processed += 1;
 	}
 
+    progress_thread.join();
 	oldMetaFile.close();
 	newMetaFile.close();
 
