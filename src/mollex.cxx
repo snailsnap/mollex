@@ -276,7 +276,7 @@ int main(int argc, char **argv) {
 		lines.emplace_back(line);
 	}
 
-    std::atomic<int> lines_processed = 0;
+    std::atomic<int> lines_processed { 0 };
 
     const auto print_progress = [&] {
         while (lines_processed != lines.size()) {
