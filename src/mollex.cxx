@@ -16,6 +16,8 @@
 
 using contour = std::vector<cv::Point2i>;
 
+const int32_t downsampling_width = 256;
+
 #if !(__cplusplus >= 201703L)
 namespace std {
 template<typename T>
@@ -160,27 +162,37 @@ cv::Mat prefilter(cv::Mat in) {
 	return tmp;
 }
 
+std::vector<contour> process_image(const cv::Mat& img) {
+    const cv::Mat filtered = prefilter(img);
+    cv::Mat thresholded = threshold(filtered);
+   
+    morphological_filtering(thresholded);
+	return find_contours(thresholded);
+}
+
+const cv::Scalar black { 0, 0, 0 };
+const cv::Scalar white { 255, 255, 255 };
+const cv::Scalar red { 0, 0, 255 };
+
 std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
     std::vector<cv::Mat> images;
 
     const cv::Mat img = cv::imread(inDir + "/" + imageName + ".jpg");
     if (!img.data) return images;
-    const cv::Mat filtered = prefilter(img);
-    cv::Mat thresholded = threshold(filtered);
-   
-    morphological_filtering(thresholded);
-
-    const std::vector<contour> contours { find_contours(thresholded) };
-    const cv::Scalar red { 0, 0, 255 };
-	std::vector<cv::Mat> channels(3);
+    const std::vector<contour> contours { process_image(img) };
+	std::vector<cv::Mat> channels(4);
 	cv::split(img, channels);
-	channels.push_back(thresholded);
-	cv::Mat outImage;
-	cv::merge(channels, outImage);
-	int i = 0;
-	for (auto contour : contours) {
-		auto boundingBox = cv::boundingRect(contour);
+	for (int i = 0; i < contours.size(); i++) {
+		const auto boundingBox = cv::boundingRect(contours[i]);
+		cv::Mat contour_alpha { img.size(), CV_8UC1, cv::Scalar { 0 } };
+		cv::drawContours(contour_alpha, contours, i, white, cv::FILLED);
+		channels.resize(3);
+		channels.push_back(contour_alpha);
+		cv::Mat outImage;
+		cv::merge(channels, outImage);
 		auto segment = cv::Mat(outImage, boundingBox).clone();
+		const auto scale_factor = (boundingBox.size().width >= downsampling_width) ? downsampling_width/(double)boundingBox.size().width : 1.0;
+		cv::resize(segment, segment, cv::Size{}, scale_factor, scale_factor, cv::INTER_AREA);
 		images.push_back(segment);
 	}
 	return images;
