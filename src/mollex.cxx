@@ -149,8 +149,8 @@ cv::Mat prefilter(cv::Mat in) {
     cv::Mat tmp, filtered;
 
     cv::bilateralFilter(in, filtered, 9, 100, 100);
-    cv::GaussianBlur(filtered, filtered, cv::Size { 5, 5 }, 10.0);
 #ifdef PREFILTER_GAUSSIAN
+    cv::GaussianBlur(filtered, filtered, cv::Size { 5, 5 }, 10.0);
 #endif
     cv::pyrMeanShiftFiltering(filtered, tmp, 3.0, 20.0, 5);
 
