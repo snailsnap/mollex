@@ -234,7 +234,6 @@ void process_line(const std::string& line, std::ostream& newMetaFile) {
 	std::getline(ss, entry, ';');//Hackathon download Link
 
 	//read image names
-	#pragma omp for
 	while (std::getline(ss, entry, ';')) {
 		if (entry != "") {
 			auto ss1 = std::stringstream(entry);
@@ -267,11 +266,15 @@ int main(int argc, char **argv) {
 	int lineNr = 1;
 	std::getline(oldMetaFile, line);
 
-	#pragma omp parallel
+	std::vector<std::string> lines;
 	while (std::getline(oldMetaFile, line)) {
+		lines.emplace_back(line);
+	}
+
+	#pragma omp parallel for
+	for (auto it = lines.cbegin(); it != lines.cend(); it++) {
 		std::cout << "line " << lineNr << std::endl;
-		#pragma omp for
-		process_line(line, newMetaFile);
+		process_line(*it, newMetaFile);
 		lineNr++;
 	}
 
