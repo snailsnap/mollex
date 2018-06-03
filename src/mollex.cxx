@@ -189,7 +189,6 @@ std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
 		cv::Mat outImage;
 		cv::merge(channels, outImage);
 		auto segment = cv::Mat(outImage, boundingBox).clone();
-		cv::resize(segment, segment, cv::Size{ 256, 256 }, 1.0, 1.0, cv::INTER_AREA);
 		images.push_back(segment);
 	}
 	return images;
