@@ -86,7 +86,7 @@ double determine_threshold(const cv::Mat& img) {
     cv::calcHist(std::vector<cv::Mat>{ blurred }, std::vector<int>{ 0 },
         cv::Mat(), hist, std::vector<int>{ buckets },
         std::vector<float>{ 0.0, 1.0 }
-    );
+    );  
 
     int max_idx = 0, max = 0;
     for (int i = 0; i < half_buckets; i++) {
@@ -219,7 +219,7 @@ std::string getColor(cv::Mat image) {
 	return ss.str();
 }
 
-void write_image(const std::string& imageName, const std::string& data, std::ostream& newMetaFile) {
+void write_image(const std::string& imageName, const std::vector<std::string>& data, std::ostream& newMetaFile) {
 	const auto images = process(imageName, "images");
 	int i = 0;
 	for (auto image : images) {
@@ -241,12 +241,12 @@ void write_image(const std::string& imageName, const std::string& data, std::ost
 }
 
 void process_line(const std::string& line, std::ostream& newMetaFile) {
-	std::string data;
+	std::vector<std::string> data;
 	std::stringstream ss(line);
 	std::string entry;
 	for (auto i = (size_t)0; i < 13; ++i) {
 		std::getline(ss, entry, ';');
-		data += entry;
+		data.push_back(entry);
 	}
 	std::getline(ss, entry, ';');//Hackathon download Link
 
