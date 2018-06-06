@@ -10,6 +10,7 @@
 
 #include "tunables.h"
 
+#include "molluscoid.h"
 #include "detect.h"
 
 const int32_t downsampling_width = 256;
@@ -22,29 +23,6 @@ constexpr const T& clamp(const T& val, const T& min, const T& max) {
 }
 }
 #endif
-
-cv::RotatedRect normalize_rrect(cv::RotatedRect rr) {
-	if (rr.size.height > rr.size.width) {
-		rr.angle += 90;
-		std::swap(rr.size.height, rr.size.width);
-	}
-	return rr;
-}
-
-double molluscoid::ratio() const {
-	return bounding_rect.size.height/bounding_rect.size.width;
-}
-double molluscoid::angle() const {
-	return (bounding_rect.angle * M_PI) / 180;
-}
-
-molluscoid::molluscoid(const contour& _cont, const cv::Mat& _image) :
-	cont{_cont},
-	image{_image},
-	bounding_rect{normalize_rrect(cv::minAreaRect(cont))} {
-}
-
-molluscoid::~molluscoid() {}
 
 bool moldec::decide(const contour& cont) {
     const double area = cv::contourArea(cont);
