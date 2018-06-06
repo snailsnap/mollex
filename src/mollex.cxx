@@ -14,24 +14,11 @@
 #include <opencv/cv.hpp>
 
 void write_image(const std::string& imageName, const std::vector<std::string>& data, std::ostream& newMetaFile) {
-	const auto images = process(imageName, "images");
-	int i = 0;
-	for (auto image : images) {
-		const std::string fname { imageName + "_" + std::to_string(i) + ".png" };
-		cv::imwrite("data/" + fname, image);
-		newMetaFile << fname << ";";
-		newMetaFile << "#" << getColor(image) << ";";
-		newMetaFile << "0.0;";
-		newMetaFile << "1.0;";
-		newMetaFile << imageName << ".jpg";
-			
-		for (auto d : data) {
-			newMetaFile << ";" << d;
-		}
-		newMetaFile << std::endl;
+    const cv::Mat img = cv::imread("images/" + imageName + ".jpg");
+    if (!img.data) return;
+	const moldec md { img };
 
-		i++;
-	}
+	md.write_images(newMetaFile, data, imageName);
 }
 
 void process_line(const std::string& line, std::ostream& newMetaFile) {

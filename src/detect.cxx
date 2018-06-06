@@ -9,7 +9,7 @@
 
 #include "tunables.h"
 
-using contour = std::vector<cv::Point2i>;
+#include "detect.h"
 
 const int32_t downsampling_width = 256;
 
@@ -22,7 +22,7 @@ constexpr const T& clamp(const T& val, const T& min, const T& max) {
 }
 #endif
 
-bool decide(const contour& cont) {
+bool moldec::decide(const contour& cont) {
     const double area = cv::contourArea(cont);
     const cv::RotatedRect brect = cv::minAreaRect(cont);
     const double brect_area = brect.size.area();
@@ -54,9 +54,8 @@ bool decide(const contour& cont) {
     return false;
 }
 
-std::vector<contour> find_contours(const cv::Mat& in) {
-    std::vector<contour> contours;
-    cv::findContours(in, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+void moldec::find_contours() {
+    cv::findContours(thresholded, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
     contours.erase(
         std::remove_if(contours.begin(), contours.end(), decide),
         contours.end()
@@ -66,11 +65,9 @@ std::vector<contour> find_contours(const cv::Mat& in) {
     std::cout << "Found " << contours.size()
               << " potential molluscs" << std::endl;
 #endif
-
-    return contours;
 }
 
-double determine_threshold(const cv::Mat& img) {
+double moldec::determine_threshold(const cv::Mat& img) const {
     cv::Mat hist, blurred;
 
     assert(HIST_BUCKETS <= 8);
@@ -95,11 +92,11 @@ double determine_threshold(const cv::Mat& img) {
                       0.0, 1.0);
 }
 
-cv::Mat threshold(const cv::Mat& in) {
-    cv::Mat out, tmp = in.clone();
+void moldec::threshold(const cv::Mat& img) {
+    cv::Mat out, tmp = img.clone();
 
 #ifdef THRESHOLD
-    const double threshold = determine_threshold(in);
+    const double threshold = determine_threshold(img);
 #ifdef DEBUG
     std::cout << "threshold: " << threshold << std::endl;
 #endif
@@ -108,7 +105,7 @@ cv::Mat threshold(const cv::Mat& in) {
     tmp.convertTo(out, CV_8UC1, 255.0);
     cv::compare(out, 0, out, cv::CMP_GT);
 
-    return out;
+    thresholded = out;
 }
 
 cv::Mat get_structuring_element(const int order) {
@@ -157,29 +154,18 @@ cv::Mat prefilter(cv::Mat in) {
 	return tmp;
 }
 
-std::vector<contour> process_image(const cv::Mat& img) {
-    const cv::Mat filtered = prefilter(img);
-    cv::Mat thresholded = threshold(filtered);
-   
-    morphological_filtering(thresholded);
-	return find_contours(thresholded);
-}
-
 const cv::Scalar black { 0, 0, 0 };
 const cv::Scalar white { 255, 255, 255 };
 const cv::Scalar red { 0, 0, 255 };
 
-std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
-    std::vector<cv::Mat> images;
-
-    const cv::Mat img = cv::imread(inDir + "/" + imageName + ".jpg");
-    if (!img.data) return images;
-    const std::vector<contour> contours { process_image(img) };
+void moldec::extract_molluscoids() {
 	std::vector<cv::Mat> channels(4);
-	cv::split(img, channels);
+	cv::split(origin, channels);
+	molluscoids.clear();
+	molluscoids.reserve(contours.size());
 	for (int i = 0; i < contours.size(); i++) {
 		const auto boundingBox = cv::boundingRect(contours[i]);
-		cv::Mat contour_alpha { img.size(), CV_8UC1, cv::Scalar { 0 } };
+		cv::Mat contour_alpha { origin.size(), CV_8UC1, cv::Scalar { 0 } };
 		cv::drawContours(contour_alpha, contours, i, white, cv::FILLED);
 		channels.resize(3);
 		channels.push_back(contour_alpha);
@@ -188,12 +174,11 @@ std::vector<cv::Mat> process(std::string imageName, std::string inDir) {
 		auto segment = cv::Mat(outImage, boundingBox).clone();
 		const auto scale_factor = (boundingBox.size().width >= downsampling_width) ? downsampling_width/(double)boundingBox.size().width : 1.0;
 		cv::resize(segment, segment, cv::Size{}, scale_factor, scale_factor, cv::INTER_AREA);
-		images.push_back(segment);
+		molluscoids.push_back(segment);
 	}
-	return images;
 }
 
-std::string getColor(cv::Mat image) {
+std::string moldec::get_color(const cv::Mat& image) const {
 	cv::MatIterator_<cv::Vec4b> start, end;
 	auto r = 0.0;
 	auto g = 0.0;
@@ -214,3 +199,37 @@ std::string getColor(cv::Mat image) {
 	return ss.str();
 }
 
+moldec::moldec(const cv::Mat& img) :
+	origin{img} {
+    const cv::Mat filtered = prefilter(origin);
+    threshold(filtered);
+    morphological_filtering(thresholded);
+
+	find_contours();
+	extract_molluscoids();
+}
+moldec::~moldec() {}
+
+void moldec::write_images(std::ostream& newMetaFile, const std::vector<std::string>& data, const std::string& imageName) const {
+	int i = 0;
+    for (auto image: molluscoids) {
+        const std::string fname { imageName + "_" + std::to_string(i) + ".png" };
+        cv::imwrite("data/" + fname, image);
+        newMetaFile << fname << ";";
+        newMetaFile << "#" << get_color(image) << ";";
+        newMetaFile << "0.0;";
+        newMetaFile << "1.0;";
+        newMetaFile << imageName << ".jpg";
+
+        for (auto d : data) {
+            newMetaFile << ";" << d;
+        }
+        newMetaFile << std::endl;
+
+        i++;
+    }	
+}
+
+void moldec::get_contours() const {
+	return contours;
+}
