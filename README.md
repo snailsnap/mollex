@@ -1,6 +1,5 @@
 # mollex: mollusc extractor
 
-## English
 mollex extracts molluscoid shapes from images.
 Mollusca is a phylum containing cephalopods (octopods etc.)
 and gastropods (such as snails and slugs).
@@ -14,9 +13,6 @@ prefiltering and finally finding contours that match typical
 molluscoid shapes.
 
 We tested mollex only on snail-like shapes.
-
-## Deutsch
-Muscheln und Schnecken des Museums für Naturkunde Berlin freistellen und neue Bilder generieren.
 
 ## Daten
 
