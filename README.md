@@ -16,10 +16,10 @@ We tested mollex only on snail-like shapes.
 
 ## Daten
 
-  - [Coding da Vinci Daten Seite](https://codingdavinci.de/daten/#museum-f%C3%BCr-naturkunde-berlin)
-  - [Metadaten](http://gbif.naturkundemuseum-berlin.de/CDV2018/Mollusken/Metadaten/)
-  - [Mediendateien](http://gbif.naturkundemuseum-berlin.de/CDV2018/Mollusken/)
-  - [Gallerie-Ansicht](http://gbif.naturkundemuseum-berlin.de/CDV2018/mollusken-gallery.html)
+  - [Coding da Vinci](https://codingdavinci.de/daten/#museum-f%C3%BCr-naturkunde-berlin)
+  - [Metadata](http://gbif.naturkundemuseum-berlin.de/CDV2018/Mollusken/Metadaten/)
+  - [Image Files](http://gbif.naturkundemuseum-berlin.de/CDV2018/Mollusken/)
+  - [Gallery View](http://gbif.naturkundemuseum-berlin.de/CDV2018/mollusken-gallery.html)
   
   
 ![](https://img1.picload.org/image/dogggpcw/image18.png)  
