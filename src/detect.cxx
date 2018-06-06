@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
@@ -21,6 +22,29 @@ constexpr const T& clamp(const T& val, const T& min, const T& max) {
 }
 }
 #endif
+
+cv::RotatedRect normalize_rrect(cv::RotatedRect rr) {
+	if (rr.size.height > rr.size.width) {
+		rr.angle += 90;
+		std::swap(rr.size.height, rr.size.width);
+	}
+	return rr;
+}
+
+double molluscoid::ratio() const {
+	return bounding_rect.size.height/bounding_rect.size.width;
+}
+double molluscoid::angle() const {
+	return (bounding_rect.angle * M_PI) / 180;
+}
+
+molluscoid::molluscoid(const contour& _cont, const cv::Mat& _image) :
+	cont{_cont},
+	image{_image},
+	bounding_rect{normalize_rrect(cv::minAreaRect(cont))} {
+}
+
+molluscoid::~molluscoid() {}
 
 bool moldec::decide(const contour& cont) {
     const double area = cv::contourArea(cont);
@@ -108,7 +132,7 @@ void moldec::threshold(const cv::Mat& img) {
     thresholded = out;
 }
 
-cv::Mat get_structuring_element(const int order) {
+static cv::Mat get_structuring_element(const int order) {
     const int ksize = (order << 1) + 1;
     return cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(ksize, ksize));
 }
@@ -174,11 +198,11 @@ void moldec::extract_molluscoids() {
 		auto segment = cv::Mat(outImage, boundingBox).clone();
 		const auto scale_factor = (boundingBox.size().width >= downsampling_width) ? downsampling_width/(double)boundingBox.size().width : 1.0;
 		cv::resize(segment, segment, cv::Size{}, scale_factor, scale_factor, cv::INTER_AREA);
-		molluscoids.push_back(segment);
+		molluscoids.emplace_back(contours[i], segment);
 	}
 }
 
-std::string moldec::get_color(const cv::Mat& image) const {
+std::string molluscoid::get_color() const {
 	cv::MatIterator_<cv::Vec4b> start, end;
 	auto r = 0.0;
 	auto g = 0.0;
@@ -212,13 +236,13 @@ moldec::~moldec() {}
 
 void moldec::write_images(std::ostream& newMetaFile, const std::vector<std::string>& data, const std::string& imageName) const {
 	int i = 0;
-    for (auto image: molluscoids) {
+    for (auto moll: molluscoids) {
         const std::string fname { imageName + "_" + std::to_string(i) + ".png" };
-        cv::imwrite("data/" + fname, image);
+        cv::imwrite("data/" + fname, moll.image);
         newMetaFile << fname << ";";
-        newMetaFile << "#" << get_color(image) << ";";
-        newMetaFile << "0.0;";
-        newMetaFile << "1.0;";
+        newMetaFile << "#" << moll.get_color() << ";";
+        newMetaFile << moll.angle() << ";";
+        newMetaFile << moll.ratio() << ";";
         newMetaFile << imageName << ".jpg";
 
         for (auto d : data) {
@@ -230,6 +254,6 @@ void moldec::write_images(std::ostream& newMetaFile, const std::vector<std::stri
     }	
 }
 
-void moldec::get_contours() const {
+std::vector<contour> moldec::get_contours() const {
 	return contours;
 }
